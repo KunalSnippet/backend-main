@@ -1,0 +1,17 @@
+{
+  "name": "backend-main",
+  "version": "1.0.0",
+  "description": "backend project",
+  "keywords": [
+    "backend",
+    "learning",
+    "chai"
+  ],
+  "license": "ISC",
+  "author": "Kunal Badgujar",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  }
+}
