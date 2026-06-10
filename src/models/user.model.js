@@ -1,4 +1,4 @@
-import mongoose, {Schema} from "momngoose";
+import mongoose, {Schema} from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
 
@@ -32,9 +32,8 @@ const userSchema = new Schema({
   },
   coverImage: {
     type: String, // URL to the user's cover image
-    required: true,
   },
-  wacthHistory: [{
+  watchHistory: [{
     type: Schema.Types.ObjectId,
     ref: "Video",
   }],
@@ -43,16 +42,15 @@ const userSchema = new Schema({
   }
 }, {timestamps: true});
 
-userSchema.pre("save", async function(next) {
-  if(!isModified("password")) return(next());
+userSchema.pre("save", async function () {
+  if(!this.isModified("password")) return;
 
-  this.paasword = bcrypt.hash(this.password, 10);
-  next();
+  this.password = await bcrypt.hash(this.password, 10);
 });
 
 userSchema.methods.isPasswordCorrect = async function(password) {
   return await bcrypt.compare(password, this.password);
-}
+};
 
 userSchema.methods.generateAccessToken = function() {
   return jwt.sign(
@@ -67,7 +65,7 @@ userSchema.methods.generateAccessToken = function() {
       expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
     }
   )
-}
+};
 
 userSchema.methods.generateRefreshToken = function() {
   return jwt.sign(
@@ -79,6 +77,6 @@ userSchema.methods.generateRefreshToken = function() {
       expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
     }
   )
-}
+};
 
 export const User = mongoose.model("User", userSchema);
