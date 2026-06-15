@@ -4,8 +4,9 @@ import {User} from "../models/user.model.js"
 import {uploadOnCloud} from "../utils/cloudinary.js";
 import {ApiResponse} from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken";
+import mongoose from "mongoose";
 
-const generateAccessAndRefreshTokens = async (userId) => {
+const generateAccessAndRefreshTokens = async(userId) => {
 
   try {
 
@@ -146,8 +147,8 @@ const logOutUser = asyncHandler( async (req, res) => {
   await User.findByIdAndUpdate(
     req.user._id,
     {
-      $set: {
-        refreshToken: undefined
+      $unset: {
+        refreshToken: 1
       }
     },
     {
@@ -169,7 +170,10 @@ const logOutUser = asyncHandler( async (req, res) => {
 });
 
 const refreshAccessToken = asyncHandler( async (req, res) => {
+
   const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
+
+  console.log("incomingRefreshToken:", incomingRefreshToken);
 
   if(!incomingRefreshToken) {
     throw new ApiError(401, "Unauthorized request");
@@ -178,7 +182,11 @@ const refreshAccessToken = asyncHandler( async (req, res) => {
   try {
     const decodedToken = jwt.verify(incomingRefreshToken, process.env.REFRESH_TOKEN_SECRET);
 
+    console.log("decodedToken:", decodedToken);
+
     const user = await User.findById(decodedToken?._id);
+
+    console.log("user:", user);
 
     if(!user){
       throw new ApiError(400, "Invalid token");
@@ -188,7 +196,7 @@ const refreshAccessToken = asyncHandler( async (req, res) => {
       throw new ApiError(401, "RefreshToken not matched");
     }
 
-    const {accessToken, newRefreshToken} = await generateAccessAndRefreshTokens(user._id);
+    const {accessToken, refreshToken} = await generateAccessAndRefreshTokens(user._id);
 
     const options = {
       httpOnly: true,
@@ -196,19 +204,23 @@ const refreshAccessToken = asyncHandler( async (req, res) => {
     }
 
     return res.status(201)
-    .cookie("accessToken", accessToken, opitons)
-    .cookie("refreshToken", newRefreshToken, opitons)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
     .json(
       new ApiResponse(
         200,
-        {accessToken, newRefreshToken},
+        {
+        accessToken,
+        refreshToken
+      },
         "Access Token Refreshed"
       )
     )
 
   } catch (error) {
-    throw new ApiError(401, "Token not generated")
-  }
+  console.log(error);
+  throw new ApiError(401, error?.message || "Token not generated");
+}
 
 });
 
@@ -292,7 +304,7 @@ const updateUserAvatar = asyncHandler( async (req, res) => {
     {
       new: true
     }
-  ).select("-password -refershToken");
+  ).select("-password -refreshToken");
 
   return res.status(201).json(
     new ApiResponse(
@@ -308,12 +320,12 @@ const updateUserCoverImage = asyncHandler( async (req, res) => {
   const coverImageLocalPath = req.file?.path;
 
   if(!coverImageLocalPath){
-    throw new ApiError(400, "Avatar file missing");
+    throw new ApiError(400, "coverImage file missing");
   }
 
   const coverImage = await uploadOnCloud(coverImageLocalPath);
 
-  if(!avatar){
+  if(!coverImage){
     throw new ApiError(500, "Something went wrong during uploading the file");
   }
 
@@ -333,7 +345,7 @@ const updateUserCoverImage = asyncHandler( async (req, res) => {
     new ApiResponse(
       200,
       {},
-      "avatar updated successfully"
+      "coverImage updated successfully"
     )
   );
 
@@ -369,7 +381,7 @@ const userSubscribtionDetails = asyncHandler ( async (req, res) => {
       }
     },
     {
-      addfields: {
+      $addFields: {
         subscribersCount: {
           $size: "$subscribers"
         },
@@ -406,7 +418,7 @@ const userSubscribtionDetails = asyncHandler ( async (req, res) => {
   return res.status(200).json(
     new ApiResponse(
       200,
-      channel[0],
+      channel[0], 
       "User-Channel details fetched successfully"
     )
   );
@@ -435,7 +447,7 @@ const getWatchHistory = asyncHandler ( async (req, res) => {
               as: "owner",
               pipeline: [
                 {
-                  $projects: {
+                  $project: {
                     fullname: 1,
                     username: 1,
                     avatar: 1
